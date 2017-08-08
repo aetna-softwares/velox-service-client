@@ -1,0 +1,19 @@
+{
+    "env": {
+        "browser": true
+    },
+    "parserOptions": {
+        "sourceType": "module" 
+    },
+    "rules": {
+        "semi": [2, "always"],
+        "no-const-assign": "warn",
+        "no-this-before-super": "warn",
+        "no-undef": "error",
+        "no-unreachable": "warn",
+        "no-unused-vars": "warn",
+        "constructor-super": "warn",
+        "valid-typeof": "warn",
+        "handle-callback-err": "warn"
+    }
+}
