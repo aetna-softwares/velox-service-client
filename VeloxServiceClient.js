@@ -31,7 +31,7 @@
 
         if(this.options.serverUrl[this.options.serverUrl.length-1] !== "/"){
             //add trailing slash
-            this.options.serverUrl+"/" ;
+            this.options.serverUrl = this.options.serverUrl+"/" ;
         }
 
         if(!this.options.dataEncoding){
@@ -49,6 +49,27 @@
     }
 
     /**
+     * Init the client
+     * 
+     * @param {function} callback called on init done
+     */
+    VeloxServiceClient.prototype.init = function (callback) {
+        initExtension.bind(this)(VeloxServiceClient.extensions.slice(), callback) ;
+    } ;
+
+    function initExtension(extensionsToInit, callback){
+        if(extensionsToInit.length === 0){
+            return callback() ;
+        }
+        var extension = extensionsToInit.shift() ;
+        extension.init(this, function(err){
+            if(err){ return callback(err); }
+            initExtension.bind(this)(extensionsToInit, callback) ;
+        }.bind(this)) ;
+    }
+
+
+    /**
      * Perform ajax call
      * 
      * @param {string} url the url to call
@@ -62,7 +83,9 @@
             callback = dataEncoding;
             dataEncoding = this.options.dataEncoding ;
         }
+        method = method.toUpperCase() ;
         var xhr = new XMLHttpRequest();
+        xhr.withCredentials = true ;
         if(method === "GET" && data){
             var querystring = [] ;
             Object.keys(data).forEach(function(k){
@@ -71,8 +94,8 @@
             url = url+"?"+querystring.join("&") ;
         }
         
-        xhr.open(method, url);
-        xhr.setRequestHeader("Content-type", "application/json");
+        xhr.open(method, this.options.serverUrl+url);
+
 
         xhr.onreadystatechange = (function () {
             
@@ -85,28 +108,41 @@
                 }
                 if(xhr.status >= 200 && xhr.status < 300) {
                     callback(null, responseResult);
-                } else {
+                }  else if(xhr.status > 0){
                     callback(responseResult||xhr.status);
                 }
             } 
         }).bind(this);
+
+        xhr.onerror = (function (err) {
+            callback(err) ;
+        }).bind(this);
+
+
         if(this.options.xhrPrepare){
             this.options.xhrPrepare(xhr) ;
         }
-        if(method === "POST" || method === "PUT"){
-            xhr.setRequestHeader("Content-type", "application/json");
-            if(dataEncoding === "json"){
-                xhr.send(JSON.stringify(data));
-            }else{
-                var formData = new FormData();
-                Object.keys(data).forEach(function(k){
-                    formData.append(k, data[k]) ;
-                }) ;
-                xhr.send(formData);
+
+        try{
+            if(method === "POST" || method === "PUT"){
+                if(dataEncoding === "json"){
+                    xhr.setRequestHeader("Content-type", "application/json");
+                    xhr.send(JSON.stringify(data));
+                }else{
+                    var urlEncodedDataPairs = [];
+                    Object.keys(data).forEach(function(k){
+                        urlEncodedDataPairs.push(encodeURIComponent(k) + '=' + encodeURIComponent(data[k]));
+                    }) ;
+                    var urlEncodedData = urlEncodedDataPairs.join('&').replace(/%20/g, '+');
+
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                    xhr.send(urlEncodedData);
+                }
+            } else {
+                xhr.send();
             }
-            
-        } else {
-            xhr.send();
+        }catch(err){
+            callback(err) ;
         }
     } ;
 
@@ -136,6 +172,15 @@
      */
     VeloxServiceClient.prototype.addEndPoints = function(endPoints){
         endPoints.forEach(function(endPoint){
+            if(!endPoint.endpoint){
+                throw "Your endpoint definition miss endpoint option" ;
+            }
+            if(!endPoint.method){
+                throw "Your endpoint "+endPoint.endpoint+" definition miss method option" ;
+            }
+            if(["GET", "POST", "PUT", "DELETE"].indexOf(endPoint.method.toUpperCase()) === -1){
+                throw "Your endpoint "+endPoint.endpoint+" definition method option is incorrect (expecting: GET, POST, PUT or DELETE" ;
+            }
             this.addEndPoint(endPoint.endpoint, endPoint.method, endPoint.dataEncoding, endPoint.args) ;
         }.bind(this)) ;
     } ;
@@ -167,6 +212,13 @@
                 { optional: true }
             ] ;
         }
+
+        args = args.map(function(a){
+            if(typeof(a) === "string"){
+                return { name : a } ;
+            }
+            return a;
+        });
 
         var hasOptional = false;
         args.forEach(function(arg, i){
@@ -210,7 +262,7 @@
                     }
                 }
             }) ;
-            this.ajax(this.options.serverUrl+endpoint, method, data, dataEncoding, callback) ;
+            this.ajax(endpoint, method, data, dataEncoding, callback) ;
         }.bind(this) ;
     } ;
 
