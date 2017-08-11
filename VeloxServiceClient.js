@@ -202,6 +202,22 @@
      * @param {Array} [args] the arguments definition
      */
     VeloxServiceClient.prototype.addEndPoint = function (endpoint, method, dataEncoding, args) {
+        this._registerEndPointFunction(endpoint, this._createEndPointFunction(endpoint, method, dataEncoding, args)) ;
+    } ;
+
+    VeloxServiceClient.prototype._registerEndPointFunction = function(endpoint, fun){
+        var splittedEndPoint = endpoint.split("/") ;
+        var currentThis = this;
+        for(var i=0; i< splittedEndPoint.length - 1; i++){
+            if(!this[splittedEndPoint[i]]){
+                this[splittedEndPoint[i]] = {};
+            }
+            currentThis = this[splittedEndPoint[i]] ;
+        }
+        currentThis[splittedEndPoint[splittedEndPoint.length-1]] = fun.bind(this) ;
+    } ;
+
+    VeloxServiceClient.prototype._createEndPointFunction = function(endpoint, method, dataEncoding, args){
         if(Array.isArray(dataEncoding)){
             args = dataEncoding ;
             dataEncoding = null;
@@ -233,15 +249,7 @@
             }
         }) ;
 
-        var splittedEndPoint = endpoint.split("/") ;
-        var currentThis = this;
-        for(var i=0; i< splittedEndPoint.length - 1; i++){
-            if(!this[splittedEndPoint[i]]){
-                this[splittedEndPoint[i]] = {};
-            }
-            currentThis = this[splittedEndPoint[i]] ;
-        }
-        currentThis[splittedEndPoint[splittedEndPoint.length-1]] = function(){
+        return function(){
             var receivedArgs = Array.prototype.slice.call(arguments) ;
             var callback = receivedArgs[receivedArgs.length-1] ;
             if(!callback){
