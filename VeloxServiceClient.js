@@ -37,6 +37,7 @@
         if(!this.options.dataEncoding){
             this.options.dataEncoding = "form" ;
         }
+        this.ajaxInterceptors = [];
 
         var self = this ;
         VeloxServiceClient.extensions.forEach(function(extension){
@@ -68,6 +69,33 @@
         }.bind(this)) ;
     }
 
+    /**
+     * Add an ajax interceptor, it will be called on ajax return
+     * 
+     * @example
+     * api.addAjaxInterceptor(function(response, next){
+     *          if(response.status === 401){
+     *              //receive a 401, user should login
+     *              ... redirect to login ...
+     *              return;
+     *          }
+     *          next() ;//OK
+     *      }) ;
+     * 
+     * @param {function} interceptor the interceptor, receive ({status : ..., responseText: ..., responseJson: ...}, next)
+     */
+    VeloxServiceClient.prototype.addAjaxInterceptor = function(interceptor){
+        this.ajaxInterceptors.push(interceptor) ;
+    } ;
+
+    function runAjaxInterceptors(interceptors, response, callback){
+        if(interceptors.length === 0){ return callback(response) ;}
+        var interceptor = interceptors.shift() ;
+
+        interceptor(response, function next(modifiedResponse){
+            runAjaxInterceptors(interceptors, modifiedResponse||response, callback) ;
+        }) ;
+    }
 
     /**
      * Perform ajax call
@@ -106,11 +134,17 @@
                         responseResult = JSON.parse(responseResult) ;
                     }catch(e){}
                 }
-                if(xhr.status >= 200 && xhr.status < 300) {
-                    callback(null, responseResult);
-                }  else if(xhr.status > 0){
-                    callback(responseResult||xhr.status);
-                }
+
+                var response = {status: xhr.status, responseText: xhr.responseText, response: responseResult} ;
+
+                runAjaxInterceptors(this.ajaxInterceptors.slice(), response, function(modifiedResponse){
+
+                    if(modifiedResponse.status >= 200 && modifiedResponse.status < 300) {
+                        callback(null, modifiedResponse.response);
+                    }  else if(xhr.status > 0){
+                        callback(modifiedResponse.response||modifiedResponse.status);
+                    }
+                }) ;
             } 
         }).bind(this);
 
