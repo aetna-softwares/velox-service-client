@@ -162,6 +162,12 @@
                 if(dataEncoding === "json"){
                     xhr.setRequestHeader("Content-type", "application/json");
                     xhr.send(JSON.stringify(data));
+                }else if(dataEncoding === "multipart"){
+                    var formData = new FormData();
+                    Object.keys(data).forEach(function (key) {
+                        formData.append(key, data[key]);
+                    }) ;
+                    xhr.send(formData);
                 }else{
                     var urlEncodedDataPairs = [];
                     Object.keys(data).forEach(function(k){
@@ -178,6 +184,7 @@
         }catch(err){
             callback(err) ;
         }
+        return xhr.upload || { addEventListener: function(){console.warn("upload listen is not supported on your browser...") ;} }
     } ;
 
 
