@@ -113,7 +113,7 @@
         }
         method = method.toUpperCase() ;
         var xhr = new XMLHttpRequest();
-        xhr.withCredentials = true ;
+        
         if(method === "GET" && data){
             var querystring = [] ;
             Object.keys(data).forEach(function(k){
@@ -123,7 +123,7 @@
         }
         
         xhr.open(method, this.options.serverUrl+url);
-
+        xhr.withCredentials = true ;
 
         xhr.onreadystatechange = (function () {
             
