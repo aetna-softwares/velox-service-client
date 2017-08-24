@@ -135,7 +135,7 @@
                     }catch(e){}
                 }
 
-                var response = {status: xhr.status, responseText: xhr.responseText, response: responseResult} ;
+                var response = {status: xhr.status, responseText: xhr.responseText, response: responseResult, url: url} ;
 
                 runAjaxInterceptors(this.ajaxInterceptors.slice(), response, function(modifiedResponse){
 
