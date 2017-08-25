@@ -58,6 +58,11 @@
         initExtension.bind(this)(VeloxServiceClient.extensions.slice(), callback) ;
     } ;
 
+
+    VeloxServiceClient.prototype.createUrl = function (url) {
+        return this.options.serverUrl+url ;
+    } ;
+
     function initExtension(extensionsToInit, callback){
         if(extensionsToInit.length === 0){
             return callback() ;
@@ -122,7 +127,7 @@
             url = url+"?"+querystring.join("&") ;
         }
         
-        xhr.open(method, this.options.serverUrl+url);
+        xhr.open(method, this.createUrl(url));
         xhr.withCredentials = true ;
 
         xhr.onreadystatechange = (function () {
