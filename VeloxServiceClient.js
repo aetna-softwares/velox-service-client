@@ -153,8 +153,8 @@
             } 
         }).bind(this);
 
-        xhr.onerror = (function (err) {
-            callback(err) ;
+        xhr.onerror = (function () {
+            callback("Ajax call to "+url+" failed") ;
         }).bind(this);
 
 
