@@ -122,7 +122,11 @@
         if(method === "GET" && data){
             var querystring = [] ;
             Object.keys(data).forEach(function(k){
-                querystring.push(k+"="+encodeURIComponent(JSON.stringify(data[k]))) ;
+                var val = data[k] ;
+                if(typeof(val) === "object"){
+                    val = JSON.stringify(val) ;
+                }
+                querystring.push(k+"="+encodeURIComponent(val)) ;
             }) ;
             url = url+"?"+querystring.join("&") ;
         }
