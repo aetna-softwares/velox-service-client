@@ -11,6 +11,32 @@
      * @property {string} serverUrl Server end point URL
      * @property {function} xhrPrepare function that receive the XHR object to customize it if needed
      * @property {string} [dataEncoding] default data encoding for ajax calls : form for formdata, json for json payload (default : form)
+     * @property {boolean} testMode run in test mode (use mockData instead of calling server)
+     * @property {VeloxServiceMock} testMocks test mock data
+     */
+
+
+    /**
+     * @typedef VeloxServiceMock
+     * @type {object}
+     * @property {VeloxServiceMockEntry[]} mocks mock list
+     */
+
+    /**
+     * @typedef VeloxServiceMockEntry
+     * @type {object}
+     * @property {string} url URL mock
+     * @property {object|VeloxServiceMockEntryResult|function} result the result to return. Can be : 
+     *      - plain data 
+     *      - a VeloxServiceMockEntryResult object (to give status)
+     *      - a function that receive params and return plain data or VeloxServiceMockEntryResult
+     */
+
+    /**
+     * @typedef VeloxServiceMockEntryResult
+     * @type {object}
+     * @property {number} [httpStatus] HTTP status (200 if not given)
+     * @property {object} resultObj the result plain object
      */
 
     /**
@@ -24,6 +50,7 @@
         if(!options || typeof(options) !== "object"){
             throw "VeloxDatabaseClient missing options" ;
         }
+        this.testMocks = options.testMocks ;
         this.options = JSON.parse(JSON.stringify(options))  ;
         if(!this.options.serverUrl){
             throw "VeloxDatabaseClient missing option serverUrl" ;
@@ -102,21 +129,35 @@
         }) ;
     }
 
-    /**
-     * Perform ajax call
-     * 
-     * @param {string} url the url to call
-     * @param {string} method the HTTP method
-     * @param {object} data the parameters to send
-     * @param {string} [dataEncoding] data encoding for ajax calls : form for formdata, json for json payload (default : from options)
-     * @param {function(Error, *)} callback called with error or result
-     */
-    VeloxServiceClient.prototype.ajax = function (url, method, data, dataEncoding, callback) {
-        if(typeof(dataEncoding) === "function"){
-            callback = dataEncoding;
-            dataEncoding = this.options.dataEncoding ;
+    VeloxServiceClient.prototype._callMock = function (url, method, data, dataEncoding, callback) {
+        if(!this.testMocks){
+            return callback("Missing mock data") ;
         }
-        method = method.toUpperCase() ;
+        var found = this.testMocks.mocks.some(function(mock){
+            if(mock.url === url){
+                if(mock.dontMock){
+                    return this._callXhr(url, method, data, dataEncoding, callback) ;
+                }
+                var result = mock.result ;
+                if(typeof(result) === 'function'){
+                    result = result(data) ;
+                }
+                if(result.httpStatus){
+                    callback(null, {status: result.httpStatus, response: result.resultObj, url: url}) ;
+                }else{
+                    callback(null, {status: 200, response: result, url: url}) ;
+                }
+                return true;
+            }
+        }.bind(this)) ;
+        if(!found){
+            return callback("Missing mock entry for URL "+url) ;
+        }
+
+        return { addEventListener: function(){console.warn("upload listen is not supported in test mode...") ;} }
+    } ;
+
+    VeloxServiceClient.prototype._callXhr = function (url, method, data, dataEncoding, callback) {
         var xhr = new XMLHttpRequest();
         
         if(method === "GET" && data){
@@ -145,15 +186,7 @@
                 }
 
                 var response = {status: xhr.status, responseText: xhr.responseText, response: responseResult, url: url} ;
-
-                runAjaxInterceptors(this.ajaxInterceptors.slice(), response, function(modifiedResponse){
-
-                    if(modifiedResponse.status >= 200 && modifiedResponse.status < 300) {
-                        callback(null, modifiedResponse.response);
-                    }  else if(xhr.status > 0){
-                        callback(modifiedResponse.response||modifiedResponse.status);
-                    }
-                }) ;
+                callback(null, response) ;
             } 
         }).bind(this);
 
@@ -194,6 +227,45 @@
             callback(err) ;
         }
         return xhr.upload || { addEventListener: function(){console.warn("upload listen is not supported on your browser...") ;} }
+    } ;
+
+    /**
+     * Perform ajax call
+     * 
+     * @param {string} url the url to call
+     * @param {string} method the HTTP method
+     * @param {object} data the parameters to send
+     * @param {string} [dataEncoding] data encoding for ajax calls : form for formdata, json for json payload (default : from options)
+     * @param {function(Error, *)} callback called with error or result
+     */
+    VeloxServiceClient.prototype.ajax = function (url, method, data, dataEncoding, callback) {
+        if(typeof(dataEncoding) === "function"){
+            callback = dataEncoding;
+            dataEncoding = this.options.dataEncoding ;
+        }
+        method = method.toUpperCase() ;
+
+        var funcToCall = "_callXhr" ;
+
+        if(this.options.testMode){
+            funcToCall = "_callMock" ;
+        }
+
+        var uploadListener = this[funcToCall](url, method, data, dataEncoding, function(err, response){
+            if(err){
+                return callback(err) ;
+            }
+            runAjaxInterceptors(this.ajaxInterceptors.slice(), response, function(modifiedResponse){
+
+                if(modifiedResponse.status >= 200 && modifiedResponse.status < 300) {
+                    callback(null, modifiedResponse.response);
+                }  else if(response.status > 0){
+                    callback(modifiedResponse.response||modifiedResponse.status);
+                }
+            }) ;
+        }.bind(this)) ;
+
+        return uploadListener ;
     } ;
 
 
