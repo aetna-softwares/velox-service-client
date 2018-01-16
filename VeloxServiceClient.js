@@ -120,12 +120,12 @@
         this.ajaxInterceptors.push(interceptor) ;
     } ;
 
-    function runAjaxInterceptors(interceptors, response, callback){
+    function runAjaxInterceptors(interceptors, err, response, callback){
         if(interceptors.length === 0){ return callback(response) ;}
         var interceptor = interceptors.shift() ;
 
-        interceptor(response, function next(modifiedResponse){
-            runAjaxInterceptors(interceptors, modifiedResponse||response, callback) ;
+        interceptor(err, response, function next(modifiedResponse){
+            runAjaxInterceptors(interceptors, err, modifiedResponse||response, callback) ;
         }) ;
     }
 
@@ -226,7 +226,7 @@
         }catch(err){
             callback(err) ;
         }
-        return xhr.upload || { addEventListener: function(){console.warn("upload listen is not supported on your browser...") ;} }
+        return xhr.upload || { addEventListener: function(){console.warn("upload listen is not supported on your browser...") ;} } ;
     } ;
 
     /**
@@ -252,10 +252,10 @@
         }
 
         var uploadListener = this[funcToCall](url, method, data, dataEncoding, function(err, response){
-            if(err){
-                return callback(err) ;
-            }
-            runAjaxInterceptors(this.ajaxInterceptors.slice(), response, function(modifiedResponse){
+            runAjaxInterceptors(this.ajaxInterceptors.slice(), err, response, function(modifiedResponse){
+                if(err){
+                    return callback(err) ;
+                }
 
                 if(modifiedResponse.status >= 200 && modifiedResponse.status < 300) {
                     callback(null, modifiedResponse.response);
