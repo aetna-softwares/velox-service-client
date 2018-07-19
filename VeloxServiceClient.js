@@ -120,12 +120,12 @@
         this.ajaxInterceptors.push(interceptor) ;
     } ;
 
-    function runAjaxInterceptors(interceptors, err, response, callback){
+    function runAjaxInterceptors(interceptors, err, request, response, callback){
         if(interceptors.length === 0){ return callback(response) ;}
         var interceptor = interceptors.shift() ;
 
-        interceptor(err, response, function next(modifiedResponse){
-            runAjaxInterceptors(interceptors, err, modifiedResponse||response, callback) ;
+        interceptor(err, request, response, function next(modifiedResponse){
+            runAjaxInterceptors(interceptors, err, request, modifiedResponse||response, callback) ;
         }) ;
     }
 
@@ -175,6 +175,7 @@
         xhr.open(method, this.createUrl(url));
         xhr.withCredentials = true ;
 
+        var callbackCalled = false ;
         xhr.onreadystatechange = (function () {
             
             if (xhr.readyState === 4){
@@ -186,12 +187,15 @@
                 }
 
                 var response = {status: xhr.status, responseText: xhr.responseText, response: responseResult, url: url} ;
+                callbackCalled = true ;
                 callback(null, response) ;
             } 
         }).bind(this);
 
         xhr.onerror = (function () {
-            callback("Ajax call to "+url+" failed") ;
+            if(!callbackCalled){
+                callback("Ajax call to "+url+" failed") ;
+            }
         }).bind(this);
 
 
@@ -252,7 +256,8 @@
         }
 
         var uploadListener = this[funcToCall](url, method, data, dataEncoding, function(err, response){
-            runAjaxInterceptors(this.ajaxInterceptors.slice(), err, response, function(modifiedResponse){
+            var request = {url: url, method: method, data: data, dataEncoding: dataEncoding} ;
+            runAjaxInterceptors(this.ajaxInterceptors.slice(), err, request, response, function(modifiedResponse){
                 if(err){
                     return callback(err) ;
                 }
@@ -261,6 +266,8 @@
                     callback(null, modifiedResponse.response);
                 }  else if(response.status > 0){
                     callback(modifiedResponse.response||modifiedResponse.status);
+                }  else {
+                    callback(modifiedResponse);
                 }
             }) ;
         }.bind(this)) ;
