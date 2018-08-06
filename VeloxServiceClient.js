@@ -1,3 +1,4 @@
+/*global define, module */
 ; (function (global, factory) {
         typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
         typeof define === 'function' && define.amd ? define(factory) :
@@ -155,7 +156,7 @@
             return callback("Missing mock entry for URL "+url) ;
         }
 
-        return { addEventListener: function(){console.warn("upload listen is not supported in test mode...") ;} }
+        return { addEventListener: function(){console.warn("upload listen is not supported in test mode...") ;} } ;
     } ;
 
     var incDownload = 0;
@@ -434,6 +435,11 @@
             args = dataEncoding ;
             dataEncoding = null;
         }
+        if(["json", "form", "multipart"].indexOf(sendMethod) !== -1){
+            dataEncoding = sendMethod ;
+            sendMethod = "ajax";
+        }
+
         if(!args){
             //if no args defined, accept 1 optional argument
             args = [
