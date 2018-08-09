@@ -53,7 +53,7 @@
             throw "VeloxDatabaseClient missing options" ;
         }
         this.testMocks = options.testMocks ;
-        this.options = JSON.parse(JSON.stringify(options))  ;
+        this.options = options  ;
         if(!this.options.serverUrl){
             throw "VeloxDatabaseClient missing option serverUrl" ;
         }
