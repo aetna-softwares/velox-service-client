@@ -131,7 +131,7 @@
         }) ;
     }
 
-    VeloxServiceClient.prototype._callMock = function (url, method, data, dataEncoding, callback) {
+    VeloxServiceClient.prototype._callMock = function (url, method, data, dataEncoding, responseEncoding, callback) {
         if(!this.testMocks){
             return callback("Missing mock data") ;
         }
@@ -210,7 +210,7 @@
 		}, 100) ;
     };
 
-    VeloxServiceClient.prototype._callXhr = function (url, method, data, dataEncoding, callback) {
+    VeloxServiceClient.prototype._callXhr = function (url, method, data, dataEncoding, responseEncoding, callback) {
         var xhr = new XMLHttpRequest();
         
         if(method === "GET" && data){
@@ -227,6 +227,12 @@
         
         xhr.open(method, this.createUrl(url));
         xhr.withCredentials = true ;
+
+        if(responseEncoding === "blob"){
+            xhr.responseType = 'blob';
+        }else if(responseEncoding === "arraybuffer"){
+            xhr.responseType = 'arraybuffer';
+        }
 
         var callbackCalled = false ;
         xhr.onreadystatechange = (function () {
@@ -295,10 +301,15 @@
      * @param {string} [dataEncoding] data encoding for ajax calls : form for formdata, json for json payload (default : from options)
      * @param {function(Error, *)} callback called with error or result
      */
-    VeloxServiceClient.prototype.ajax = function (url, method, data, dataEncoding, callback) {
+    VeloxServiceClient.prototype.ajax = function (url, method, data, dataEncoding, responseEncoding, callback) {
         if(typeof(dataEncoding) === "function"){
             callback = dataEncoding;
             dataEncoding = this.options.dataEncoding ;
+            responseEncoding = "text" ;
+        }
+        if(typeof(responseEncoding) === "function"){
+            callback = responseEncoding;
+            responseEncoding = "text" ;
         }
         method = method.toUpperCase() ;
 
@@ -308,7 +319,7 @@
             funcToCall = "_callMock" ;
         }
 
-        var uploadListener = this[funcToCall](url, method, data, dataEncoding, function(err, response){
+        var uploadListener = this[funcToCall](url, method, data, dataEncoding, responseEncoding, function(err, response){
             var request = {url: url, method: method, data: data, dataEncoding: dataEncoding} ;
             runAjaxInterceptors(this.ajaxInterceptors.slice(), err, request, response, function(modifiedResponse){
                 if(err){
@@ -388,7 +399,7 @@
             if(["GET", "POST", "PUT", "DELETE"].indexOf(endPoint.method.toUpperCase()) === -1){
                 throw "Your endpoint "+endPoint.endpoint+" definition method option is incorrect (expecting: GET, POST, PUT or DELETE" ;
             }
-            this.addEndPoint(endPoint.endpoint, endPoint.method, endPoint.sendMethod||"ajax", endPoint.dataEncoding, endPoint.args) ;
+            this.addEndPoint(endPoint.endpoint, endPoint.method, endPoint.sendMethod||"ajax", endPoint.dataEncoding, endPoint.responseEncoding, endPoint.args) ;
         }.bind(this)) ;
     } ;
 
@@ -407,10 +418,11 @@
      * @param {string} method the HTTP method to use (POST, PUT, GET, DELETE)
      * @param {string} [sendMethod] how to send the request (ajax or post)
      * @param {string} [dataEncoding] data encoding for ajax calls : form for formdata, json for json payload (default : from options)
+     * @param {string} [responseEncoding] data encoding for ajax calls : text, blob or arraybuffer (default: text)
      * @param {Array} [args] the arguments definition
      */
-    VeloxServiceClient.prototype.addEndPoint = function (endpoint, method, sendMethod, dataEncoding, args) {
-        this._registerEndPointFunction(endpoint, this._createEndPointFunction(endpoint, method, sendMethod, dataEncoding, args)) ;
+    VeloxServiceClient.prototype.addEndPoint = function (endpoint, method, sendMethod, dataEncoding, responseEncoding, args) {
+        this._registerEndPointFunction(endpoint, this._createEndPointFunction(endpoint, method, sendMethod, dataEncoding, responseEncoding, args)) ;
     } ;
 
     VeloxServiceClient.prototype._registerEndPointFunction = function(endpoint, fun){
@@ -425,15 +437,21 @@
         currentThis[splittedEndPoint[splittedEndPoint.length-1]] = fun.bind(this) ;
     } ;
 
-    VeloxServiceClient.prototype._createEndPointFunction = function(endpoint, method, sendMethod, dataEncoding, args){
+    VeloxServiceClient.prototype._createEndPointFunction = function(endpoint, method, sendMethod, dataEncoding, responseEncoding, args){
         if(Array.isArray(sendMethod)){
             args = sendMethod ;
             sendMethod = "ajax";
             dataEncoding = null;
+            responseEncoding = null;
         }
         if(Array.isArray(dataEncoding)){
             args = dataEncoding ;
             dataEncoding = null;
+            responseEncoding = null;
+        }
+        if(Array.isArray(responseEncoding)){
+            args = responseEncoding ;
+            responseEncoding = null;
         }
         if(["json", "form", "multipart"].indexOf(sendMethod) !== -1){
             dataEncoding = sendMethod ;
@@ -492,7 +510,7 @@
             if(sendMethod === "post"){
                 return this.post(endpoint, method, data, dataEncoding, callback) ;
             }else{
-                return this.ajax(endpoint, method, data, dataEncoding, callback) ;
+                return this.ajax(endpoint, method, data, dataEncoding, responseEncoding, callback) ;
             }
         }.bind(this) ;
     } ;
