@@ -238,14 +238,21 @@
         xhr.onreadystatechange = (function () {
             
             if (xhr.readyState === 4){
-                var responseResult = xhr.responseText ;
-                if(responseResult){
-                    try{
-                        responseResult = JSON.parse(responseResult) ;
-                    }catch(e){}
+                var responseResult = null ;
+                var responseText = null ;
+                if(responseEncoding === "arraybuffer" || responseEncoding === "blob"){
+                    responseResult = xhr.response ;
+                } else {
+                    responseText = xhr.responseText ;
+                    responseResult = xhr.responseText ;
+                    if(responseResult){
+                        try{
+                            responseResult = JSON.parse(responseResult) ;
+                        }catch(e){}
+                    }
                 }
 
-                var response = {status: xhr.status, responseText: xhr.responseText, response: responseResult, url: url} ;
+                var response = {status: xhr.status, responseText: responseText, response: responseResult, url: url} ;
                 callbackCalled = true ;
                 callback(null, response) ;
             } 
